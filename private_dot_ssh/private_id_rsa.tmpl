@@ -1,0 +1,6 @@
+{{- $item := (output "op" "item" "get" "ssh-keys" "--format" "json") | fromJson -}}
+{{- range $item.fields -}}
+{{- if eq .label "private" -}}
+{{ .value }}
+{{- end -}}
+{{- end -}}
