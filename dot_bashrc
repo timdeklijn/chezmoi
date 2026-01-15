@@ -1,0 +1,154 @@
+# Only run in interactive shells
+[[ $- != *i* ]] && return
+
+# ---- Aliases ----
+alias ls='eza'
+alias ll='eza -la'
+alias lt='eza -la --tree --level=2'
+alias y='yazi'
+alias h='hx'
+alias lg='lazygit'
+alias vim='nvim'
+alias zed='zeditor'
+alias nrs='sudo nixos-rebuild switch --flake .#fw13'
+alias hms='home-manager switch --flake .#tim@fw13'
+alias c='clear'
+alias copy='wl-copy'
+alias paste='wl-paste -n'
+alias rgi='rg -i'
+alias ff='fd -H'
+alias t='tmux'
+
+alias gco='git checkout'
+alias gc='git commit'
+alias gp='git push'
+alias gst='git status'
+alias k='kubectl'
+alias kgp='kubectl get pods -A'
+alias kgn='kubectl get ns'
+
+# ---- Functions ----
+# Refresh Azure auth bearer token for Cognitive Services
+# Usage: dexauth
+
+dexauth() {
+  export AUTHORIZATION="Bearer $(az account get-access-token \
+    --resource https://cognitiveservices.azure.com/ \
+    --query accessToken -o tsv)"
+}
+
+# ---- direnv (auto-load .envrc) ----
+if command -v direnv >/dev/null 2>&1; then
+  eval "$(direnv hook bash)"
+fi
+
+# ---- zoxide (fast directory jumping) ----
+if command -v zoxide >/dev/null 2>&1; then
+  eval "$(zoxide init bash)"
+fi
+
+# ---- bash-preexec (required for Atuin history in bash) ----
+if [[ -r "$HOME/.local/share/bash-preexec/bash-preexec.sh" ]]; then
+  # shellcheck disable=SC1090
+  source "$HOME/.local/share/bash-preexec/bash-preexec.sh"
+fi
+
+if command -v atuin >/dev/null 2>&1; then
+  eval "$(atuin init bash)"
+fi
+
+# ---- Prompt (PS1) ----
+
+# Ensure PS1 expands variables like ${__PROMPT_PATH}
+shopt -s promptvars
+
+# Host (no subprocess; trims domain)
+__PROMPT_HOST="${HOSTNAME%%.*}"
+
+# Prompt colors.
+# When these live in variables, Bash will not re-parse "\[...\]" or "\e" sequences,
+# so we use \001/\002 markers plus real escape bytes.
+__c_reset=$'\001\033[0m\002'
+__c_comment=$'\001\033[90m\002'
+__c_user=$'\001\033[33m\002'
+__c_host=$'\001\033[36m\002'
+__c_path=$'\001\033[32m\002'
+__c_git=$'\001\033[97m\002'
+__c_git_branch=$'\001\033[31m\002'
+__c_err=$'\001\033[31m\002'
+
+__prompt_shorten_path() {
+  local path="$1"
+  local prefix="" rest=""
+  local -a parts
+
+  if [[ "$path" == "~/"* ]]; then
+    prefix="~/"
+    rest="${path#~/}"
+  elif [[ "$path" == "~" ]]; then
+    printf "~"
+    return 0
+  elif [[ "$path" == /* ]]; then
+    prefix="/"
+    rest="${path#/}"
+  else
+    rest="$path"
+  fi
+
+  IFS='/' read -r -a parts <<< "$rest"
+
+  # Keep last 2 segments full; compress earlier ones to 1 char.
+  local keep=2 n="${#parts[@]}" i out="$prefix"
+  if (( n <= keep )); then
+    printf '%s%s' "$prefix" "$rest"
+    return 0
+  fi
+
+  for (( i=0; i<n; i++ )); do
+    if (( i < n-keep )); then
+      out+="${parts[i]:0:1}/"
+    else
+      out+="${parts[i]}"
+      (( i < n-1 )) && out+="/"
+    fi
+  done
+
+  printf '%s' "$out"
+}
+
+__prompt_update() {
+  local exit_code=$?
+
+  # Path (~ + compressed)
+  local raw_path="${PWD/#$HOME/~}"
+  __PROMPT_PATH="$(__prompt_shorten_path "$raw_path")"
+
+  # Exit status (only if non-zero)
+  __PROMPT_STATUS=""
+  if (( exit_code != 0 )); then
+    __PROMPT_STATUS="${__c_err}${exit_code}${__c_reset} "
+  fi
+
+  # Git (cheap-ish: 1 call outside repos, 2 inside)
+  __PROMPT_GIT=""
+  git rev-parse --git-dir >/dev/null 2>&1 || return 0
+
+  local branch
+  branch="$(git symbolic-ref --quiet --short HEAD 2>/dev/null)" \
+    || branch="$(git rev-parse --short HEAD 2>/dev/null)" \
+    || branch=""
+
+  if [[ -n "$branch" ]]; then
+    __PROMPT_GIT="${__c_git}(${__c_git_branch}${branch}${__c_git})${__c_reset} "
+  fi
+}
+
+# Integrate with existing PROMPT_COMMAND (atuin/direnv may use it)
+if [[ "$(declare -p PROMPT_COMMAND 2>/dev/null)" == "declare -a"* ]]; then
+  PROMPT_COMMAND=(__prompt_update "${PROMPT_COMMAND[@]}")
+else
+  PROMPT_COMMAND="__prompt_update${PROMPT_COMMAND:+; $PROMPT_COMMAND}"
+fi
+
+PS1='${__c_comment}\A${__c_reset} ${__c_user}\u${__c_reset}@${__c_host}${__PROMPT_HOST}${__c_reset}:${__c_path}${__PROMPT_PATH}${__c_reset}
+${__PROMPT_STATUS}${__PROMPT_GIT}➜ ${__c_reset}'
