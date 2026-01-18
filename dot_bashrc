@@ -5,13 +5,6 @@
 alias ls='eza'
 alias ll='eza -la'
 alias lt='eza -la --tree --level=2'
-alias y='yazi'
-alias h='hx'
-alias lg='lazygit'
-alias vim='nvim'
-alias zed='zeditor'
-alias nrs='sudo nixos-rebuild switch --flake .#fw13'
-alias hms='home-manager switch --flake .#tim@fw13'
 alias c='clear'
 alias copy='wl-copy'
 alias paste='wl-paste -n'
@@ -131,24 +124,30 @@ __prompt_update() {
 
   # Git (cheap-ish: 1 call outside repos, 2 inside)
   __PROMPT_GIT=""
-  git rev-parse --git-dir >/dev/null 2>&1 || return 0
+  if git rev-parse --git-dir >/dev/null 2>&1; then
+    local branch
 
-  local branch
-  branch="$(git symbolic-ref --quiet --short HEAD 2>/dev/null)" \
-    || branch="$(git rev-parse --short HEAD 2>/dev/null)" \
-    || branch=""
+    branch="$(git symbolic-ref --quiet --short HEAD 2>/dev/null)" \
+      || branch="$(git rev-parse --short HEAD 2>/dev/null)" \
+      || branch=""
 
-  if [[ -n "$branch" ]]; then
-    __PROMPT_GIT="${__c_git}(${__c_git_branch}${branch}${__c_git})${__c_reset} "
+    if [[ -n "$branch" ]]; then
+      __PROMPT_GIT="${__c_git}(${__c_git_branch}${branch}${__c_git})${__c_reset} "
+    fi
   fi
+  PS1='${__c_comment}\A${__c_reset} ${__c_user}\u${__c_reset}@${__c_host}${__PROMPT_HOST}${__c_reset}:${__c_path}${__PROMPT_PATH}${__c_reset}
+${__PROMPT_STATUS}${__PROMPT_GIT}➜ ${__c_reset}'
 }
 
-# Integrate with existing PROMPT_COMMAND (atuin/direnv may use it)
+# ---- Prompt hook (make ours win) ----
 if [[ "$(declare -p PROMPT_COMMAND 2>/dev/null)" == "declare -a"* ]]; then
-  PROMPT_COMMAND=(__prompt_update "${PROMPT_COMMAND[@]}")
+  # remove starship if Bluefin injected it
+  for i in "${!PROMPT_COMMAND[@]}"; do
+    [[ "${PROMPT_COMMAND[i]}" == *starship_precmd* ]] && unset 'PROMPT_COMMAND[i]'
+  done
+  PROMPT_COMMAND=("${PROMPT_COMMAND[@]}")  # reindex
+  PROMPT_COMMAND+=("__prompt_update")      # run last
 else
-  PROMPT_COMMAND="__prompt_update${PROMPT_COMMAND:+; $PROMPT_COMMAND}"
+  PROMPT_COMMAND="${PROMPT_COMMAND//starship_precmd/}"
+  PROMPT_COMMAND="${PROMPT_COMMAND:+$PROMPT_COMMAND; }__prompt_update"
 fi
-
-PS1='${__c_comment}\A${__c_reset} ${__c_user}\u${__c_reset}@${__c_host}${__PROMPT_HOST}${__c_reset}:${__c_path}${__PROMPT_PATH}${__c_reset}
-${__PROMPT_STATUS}${__PROMPT_GIT}➜ ${__c_reset}'

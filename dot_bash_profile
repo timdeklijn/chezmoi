@@ -1,6 +1,21 @@
 # ~/.bash_profile
 
-# Source interactive shell config
+# Login shells: load interactive config
 if [[ -r "$HOME/.bashrc" ]]; then
   . "$HOME/.bashrc"
 fi
+
+path_prepend () {
+  case ":$PATH:" in
+    *":$1:"*) ;;
+    *) PATH="$1:$PATH" ;;
+  esac
+}
+
+path_prepend "$HOME/bin"
+path_prepend "$HOME/.local/bin"
+path_prepend "/usr/local/bin"
+path_prepend "/usr/bin"
+path_prepend "$HOME/linuxbrew/.linuxbrew/bin"
+path_prepend "$HOME/linuxbrew/.linuxbrew/sbin"
+export PATH
