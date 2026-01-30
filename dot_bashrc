@@ -30,26 +30,6 @@ dexauth() {
     --query accessToken -o tsv)"
 }
 
-# ---- direnv (auto-load .envrc) ----
-if command -v direnv >/dev/null 2>&1; then
-  eval "$(direnv hook bash)"
-fi
-
-# ---- zoxide (fast directory jumping) ----
-if command -v zoxide >/dev/null 2>&1; then
-  eval "$(zoxide init bash)"
-fi
-
-# ---- bash-preexec (required for Atuin history in bash) ----
-if [[ -r "$HOME/.local/share/bash-preexec/bash-preexec.sh" ]]; then
-  # shellcheck disable=SC1090
-  source "$HOME/.local/share/bash-preexec/bash-preexec.sh"
-fi
-
-if command -v atuin >/dev/null 2>&1; then
-  eval "$(atuin init bash)"
-fi
-
 # for better citrix (devbox) experience
 export GTK_USE_PORTAL=1
 export QT_QPA_PLATFORM=wayland
@@ -66,7 +46,7 @@ __PROMPT_HOST="${HOSTNAME%%.*}"
 # When these live in variables, Bash will not re-parse "\[...\]" or "\e" sequences,
 # so we use \001/\002 markers plus real escape bytes.
 __c_reset=$'\001\033[0m\002'
-__c_comment=$'\001\033[96m\002' # light cyan
+__c_comment=$'\001\033[32m\002'
 __c_user=$'\001\033[33m\002'
 __c_host=$'\001\033[36m\002'
 __c_path=$'\001\033[32m\002'
